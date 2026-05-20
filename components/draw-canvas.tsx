@@ -46,6 +46,7 @@ const DrawCanvas = forwardRef<DrawCanvasHandle>(function DrawCanvas(_props, ref)
   const [color, setColor] = useState(COLORS[0]);
   const [size, setSize] = useState(SIZES[1]);
   const [eraser, setEraser] = useState(false);
+  const isCustom = !eraser && !COLORS.includes(color);
 
   function getCtx() {
     return canvasRef.current!.getContext("2d")!;
@@ -150,6 +151,33 @@ const DrawCanvas = forwardRef<DrawCanvasHandle>(function DrawCanvas(_props, ref)
             style={{ background: c }}
           />
         ))}
+
+        {/* selector de tono exacto */}
+        <label
+          aria-label="elegir tono exacto"
+          className={[
+            "relative w-7 h-7 rounded-full border-2 overflow-hidden cursor-pointer transition flex items-center justify-center",
+            isCustom
+              ? "border-[var(--ink)] scale-110 ring-2 ring-cele-200"
+              : "border-[var(--rule)]",
+          ].join(" ")}
+          style={{
+            background: isCustom
+              ? color
+              : "conic-gradient(from 0deg, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00)",
+          }}
+        >
+          {!isCustom && <span className="text-white text-xs drop-shadow font-bold">+</span>}
+          <input
+            type="color"
+            value={isCustom ? color : "#1f4f74"}
+            onChange={(e) => {
+              setColor(e.target.value);
+              setEraser(false);
+            }}
+            className="absolute inset-0 opacity-0 cursor-pointer"
+          />
+        </label>
 
         <span className="mx-1 w-px h-6 bg-[var(--rule)]" />
 
