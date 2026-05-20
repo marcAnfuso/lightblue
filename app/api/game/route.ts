@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getPublicRound, getUsedWords, submitDrawing } from "@/lib/game";
+import { getPublicRound, getUsedWords, resetGame, submitDrawing } from "@/lib/game";
 import type { Author } from "@/lib/posts";
 
 export const runtime = "nodejs";
@@ -44,6 +44,15 @@ export async function POST(req: Request) {
   try {
     const res = await submitDrawing({ author, word, dataUrl });
     if (!res.ok) return NextResponse.json({ error: res.error }, { status: 409 });
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    return NextResponse.json({ error: (err as Error).message }, { status: 500 });
+  }
+}
+
+export async function DELETE() {
+  try {
+    await resetGame();
     return NextResponse.json({ ok: true });
   } catch (err) {
     return NextResponse.json({ error: (err as Error).message }, { status: 500 });

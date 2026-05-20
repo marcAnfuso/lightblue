@@ -3,7 +3,7 @@
 import { motion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Author } from "@/lib/posts";
-import type { PublicRound } from "@/lib/game";
+import type { PublicRound, Scores } from "@/lib/game";
 import { pickWords } from "@/lib/words";
 import DrawCanvas, { type DrawCanvasHandle } from "./draw-canvas";
 
@@ -28,13 +28,23 @@ export default function Pictionary() {
     try {
       const res = await fetch("/api/game", { cache: "no-store" });
       const data = await res.json();
-      setRound(data.round ?? { status: "empty" });
+      setRound(data.round ?? { status: "empty", scores: { marc: 0, cele: 0 } });
       setUsed(Array.isArray(data.used) ? data.used : []);
     } catch {
-      setRound({ status: "empty" });
+      setRound({ status: "empty", scores: { marc: 0, cele: 0 } });
     } finally {
       setLoading(false);
     }
+  }
+
+  async function resetMatch() {
+    if (!confirm("¿Reiniciar el marcador y empezar de cero?")) return;
+    try {
+      await fetch("/api/game", { method: "DELETE" });
+    } catch {
+      /* noop */
+    }
+    load();
   }
 
   function handleAuthor(a: Author) {
@@ -59,9 +69,8 @@ export default function Pictionary() {
       <h2 className="font-hand text-4xl text-[var(--ink)] text-center">
         dibujá y adiviná 🎨
       </h2>
-      <p className="font-hand text-xl text-[var(--ink-soft)] text-center mt-1">
-        uno dibuja, el otro tiene 1:30 para adivinar.
-      </p>
+
+      {round && <Scoreboard scores={round.scores} />}
 
       <div className="flex gap-2 justify-center mt-4">
         <AuthorChip current={author} value="marc" onClick={handleAuthor} />
@@ -75,7 +84,29 @@ export default function Pictionary() {
           <Stage author={author} round={round} used={used} reload={load} />
         )}
       </div>
+
+      <button
+        onClick={resetMatch}
+        className="mt-6 block mx-auto font-note text-xs text-[var(--ink-soft)]/70 underline hover:text-[var(--ink)]"
+      >
+        reiniciar marcador
+      </button>
     </motion.section>
+  );
+}
+
+function Scoreboard({ scores }: { scores: Scores }) {
+  const leader = scores.marc === scores.cele ? null : scores.marc > scores.cele ? "marc" : "cele";
+  return (
+    <div className="mt-3 flex items-center justify-center gap-4 font-hand text-[var(--ink)]">
+      <span className={leader === "marc" ? "text-[var(--ink)]" : "text-[var(--ink-soft)]"}>
+        {leader === "marc" && "👑 "}Marc <b className="text-3xl">{scores.marc}</b>
+      </span>
+      <span className="text-[var(--ink-soft)]">·</span>
+      <span className={leader === "cele" ? "text-[var(--ink)]" : "text-[var(--ink-soft)]"}>
+        <b className="text-3xl">{scores.cele}</b> Cele{leader === "cele" && " 👑"}
+      </span>
+    </div>
   );
 }
 
@@ -92,6 +123,7 @@ function Stage({
 }) {
   const [creating, setCreating] = useState(false);
 
+  // alguien está adivinando
   if (round.status === "awaiting_guess") {
     if (author === round.guesser) {
       return <GuessView author={author} round={round} reload={reload} />;
@@ -104,6 +136,7 @@ function Stage({
     );
   }
 
+  // dibujando ahora
   if (creating) {
     return (
       <DrawView
@@ -118,39 +151,49 @@ function Stage({
     );
   }
 
-  return <Idle round={round} onStart={() => setCreating(true)} reload={reload} />;
+  // ronda terminada: dibuja quien adivinó/perdió
+  if (round.status === "done") {
+    const myTurn = author === round.nextDrawer;
+    return (
+      <div className="text-center">
+        <div className="hand-box bg-white px-5 py-5 mb-5">
+          <p className="font-hand text-2xl text-[var(--ink)]">
+            {round.result?.guessed
+              ? `¡${nameOf(round.result.guesser)} adivinó! +1 🎉`
+              : `${nameOf(round.result?.guesser)} no la sacó 😅`}
+          </p>
+          <p className="font-hand text-xl text-[var(--ink-soft)] mt-1">era “{round.word}”</p>
+        </div>
+        {myTurn ? (
+          <StartButton label="te toca dibujar 🎨" onStart={() => setCreating(true)} reload={reload} />
+        ) : (
+          <Waiting text={`le toca dibujar a ${nameOf(round.nextDrawer)} 🖍️`} reload={reload} />
+        )}
+      </div>
+    );
+  }
+
+  // vacío: arranca cualquiera
+  return <StartButton label="empezar juego nuevo 🎨" onStart={() => setCreating(true)} reload={reload} />;
 }
 
-function Idle({
-  round,
+function StartButton({
+  label,
   onStart,
   reload,
 }: {
-  round: PublicRound;
+  label: string;
   onStart: () => void;
   reload: () => void;
 }) {
   return (
     <div className="text-center">
-      {round.status === "done" && round.result && (
-        <div className="hand-box bg-white px-5 py-5 mb-5">
-          <p className="font-hand text-2xl text-[var(--ink)]">
-            {round.result.guessed
-              ? `¡${nameOf(round.result.guesser)} adivinó! 🎉`
-              : `${nameOf(round.result.guesser)} no la sacó 😅`}
-          </p>
-          <p className="font-hand text-xl text-[var(--ink-soft)] mt-1">
-            era “{round.word}”
-          </p>
-        </div>
-      )}
-
       <motion.button
         onClick={onStart}
         whileTap={{ scale: 0.96 }}
         className="w-full py-3.5 font-note bg-[var(--ink)] text-white text-lg hover:bg-[var(--ink-soft)] transition rounded-sm shadow-md"
       >
-        empezar juego nuevo 🎨
+        {label}
       </motion.button>
       <button
         onClick={reload}
@@ -220,13 +263,10 @@ function DrawView({
     }
   }
 
-  // Paso 1: elegir una de 3 palabras
   if (!word) {
     return (
       <div className="text-center">
-        <p className="font-hand text-2xl text-[var(--ink)] mb-4">
-          elegí qué dibujar 👇
-        </p>
+        <p className="font-hand text-2xl text-[var(--ink)] mb-4">elegí qué dibujar 👇</p>
         <div className="flex flex-col gap-3">
           {options.map((w) => (
             <motion.button
@@ -257,12 +297,10 @@ function DrawView({
     );
   }
 
-  // Paso 2: dibujar
   return (
     <div>
       <p className="font-hand text-2xl text-[var(--ink)] text-center">
-        dibujá:{" "}
-        <span className="text-[var(--ink-soft)]">“{word}”</span>
+        dibujá: <span className="text-[var(--ink-soft)]">“{word}”</span>
       </p>
       <p className="font-note text-xs text-[var(--ink-soft)] text-center mb-3">
         sin apuro, tomate el tiempo. {otherName(author)} lo va a adivinar 🙈
@@ -301,11 +339,19 @@ function GuessView({
 }) {
   const [phase, setPhase] = useState<"intro" | "playing" | "won" | "timeup">("intro");
   const [timeLeft, setTimeLeft] = useState(GUESS_SECONDS);
-  const [guess, setGuess] = useState("");
-  const [wrong, setWrong] = useState<string[]>([]);
+  const [placed, setPlaced] = useState<{ idx: number; ch: string }[]>([]);
+  const [wrong, setWrong] = useState(false);
   const [revealWord, setRevealWord] = useState<string | null>(null);
-  const [checking, setChecking] = useState(false);
+  const checking = useRef(false);
   const tick = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const puzzle = round.puzzle;
+  const total = useMemo(
+    () => (puzzle ? puzzle.segments.reduce((a, b) => a + b, 0) : 0),
+    [puzzle]
+  );
+  const usedIdx = useMemo(() => new Set(placed.map((p) => p.idx)), [placed]);
+  const assembled = placed.map((p) => p.ch).join("");
 
   useEffect(() => {
     return () => {
@@ -316,6 +362,7 @@ function GuessView({
   function start() {
     setPhase("playing");
     setTimeLeft(GUESS_SECONDS);
+    setPlaced([]);
     tick.current = setInterval(() => {
       setTimeLeft((t) => {
         if (t <= 1) {
@@ -344,31 +391,40 @@ function GuessView({
     }
   }
 
-  async function submitGuess() {
-    const g = guess.trim();
-    if (!g || checking) return;
-    setChecking(true);
-    try {
-      const res = await fetch("/api/game/guess", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ author, guess: g }),
-      });
-      const data = await res.json();
-      if (data?.correct) {
-        if (tick.current) clearInterval(tick.current);
-        setRevealWord(data.word ?? g);
-        setPhase("won");
-      } else {
-        setWrong((w) => [g, ...w].slice(0, 8));
-        setGuess("");
-      }
-    } catch {
-      /* noop */
-    } finally {
-      setChecking(false);
+  // auto-chequea cuando se completan todos los casilleros
+  useEffect(() => {
+    if (phase !== "playing" || total === 0 || placed.length !== total || checking.current) {
+      return;
     }
-  }
+    checking.current = true;
+    (async () => {
+      try {
+        const res = await fetch("/api/game/guess", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ author, guess: assembled }),
+        });
+        const data = await res.json();
+        if (data?.correct) {
+          if (tick.current) clearInterval(tick.current);
+          setRevealWord(data.word ?? assembled);
+          setPhase("won");
+        } else {
+          setWrong(true);
+          setTimeout(() => {
+            setWrong(false);
+            setPlaced([]);
+            checking.current = false;
+          }, 700);
+          return;
+        }
+      } catch {
+        /* noop */
+      }
+      checking.current = false;
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [placed, total, phase]);
 
   const mmss = useMemo(() => {
     const m = Math.floor(timeLeft / 60);
@@ -383,7 +439,7 @@ function GuessView({
           {nameOf(round.drawer)} te dejó un dibujo 🎨
         </p>
         <p className="font-hand text-xl text-[var(--ink-soft)] mt-1">
-          cuando empieces, tenés <b>1:30</b> para adivinar.
+          tenés <b>1:30</b> para adivinar con las letras.
         </p>
         <motion.button
           onClick={start}
@@ -405,50 +461,113 @@ function GuessView({
         className="w-full rounded-md border-2 border-[var(--ink-soft)] bg-white"
       />
 
-      {phase === "playing" && (
+      {phase === "playing" && puzzle && (
         <>
-          <div className="mt-3 flex items-center justify-center">
-            <span
+          {/* barra de tiempo */}
+          <div className="mt-3 h-2.5 w-full rounded-full bg-cele-100 overflow-hidden">
+            <div
               className={[
-                "font-hand text-4xl tabular-nums",
-                timeLeft <= 15 ? "text-rose-500" : "text-[var(--ink)]",
+                "h-full rounded-full transition-[width] duration-1000 ease-linear",
+                timeLeft <= 15 ? "bg-rose-400" : "bg-[var(--ink-soft)]",
               ].join(" ")}
-            >
-              ⏱️ {mmss}
-            </span>
-          </div>
-          <div className="mt-3 flex gap-2">
-            <input
-              value={guess}
-              onChange={(e) => setGuess(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && submitGuess()}
-              autoFocus
-              placeholder="¿qué es?"
-              className="min-w-0 flex-1 px-3 py-2 bg-transparent border-2 border-[var(--rule)] focus:border-[var(--ink)] outline-none transition font-hand text-2xl text-[var(--ink)] rounded-sm"
+              style={{ width: `${(timeLeft / GUESS_SECONDS) * 100}%` }}
             />
+          </div>
+          <p
+            className={[
+              "mt-1 text-center font-hand text-2xl tabular-nums",
+              timeLeft <= 15 ? "text-rose-500" : "text-[var(--ink-soft)]",
+            ].join(" ")}
+          >
+            {mmss}
+          </p>
+
+          {/* casilleros */}
+          <motion.div
+            animate={wrong ? { x: [-6, 6, -6, 6, 0] } : { x: 0 }}
+            transition={{ duration: 0.4 }}
+            className="mt-3 flex flex-wrap justify-center gap-x-3 gap-y-2"
+          >
+            {puzzle.segments.map((len, segIdx) => {
+              const offset = puzzle.segments.slice(0, segIdx).reduce((a, b) => a + b, 0);
+              return (
+                <div key={segIdx} className="flex gap-1">
+                  {Array.from({ length: len }).map((_, j) => {
+                    const ch = placed[offset + j]?.ch ?? "";
+                    return (
+                      <span
+                        key={j}
+                        className={[
+                          "w-7 h-9 sm:w-8 sm:h-10 flex items-center justify-center border-b-[3px] font-hand text-2xl",
+                          wrong
+                            ? "border-rose-400 text-rose-500"
+                            : "border-[var(--ink-soft)] text-[var(--ink)]",
+                        ].join(" ")}
+                      >
+                        {ch}
+                      </span>
+                    );
+                  })}
+                </div>
+              );
+            })}
+          </motion.div>
+
+          {/* banco de letras */}
+          <div className="mt-5 flex flex-wrap justify-center gap-2">
+            {puzzle.letters.map((ch, i) => {
+              const isUsed = usedIdx.has(i);
+              return (
+                <motion.button
+                  key={i}
+                  whileTap={{ scale: 0.85 }}
+                  disabled={isUsed || placed.length >= total}
+                  onClick={() => setPlaced((p) => [...p, { idx: i, ch }])}
+                  className={[
+                    "w-10 h-11 rounded-md font-hand text-2xl border-2 transition",
+                    isUsed
+                      ? "opacity-25 border-[var(--rule)] bg-transparent"
+                      : "bg-cele-50 border-[var(--ink-soft)] text-[var(--ink)] hover:bg-cele-100",
+                  ].join(" ")}
+                >
+                  {ch}
+                </motion.button>
+              );
+            })}
+          </div>
+
+          <div className="mt-4 flex items-center justify-center gap-4">
             <button
-              onClick={submitGuess}
-              disabled={checking || !guess.trim()}
-              className="shrink-0 px-4 font-note bg-[var(--ink)] text-white rounded-sm disabled:opacity-40 hover:bg-[var(--ink-soft)] transition"
+              onClick={() => setPlaced((p) => p.slice(0, -1))}
+              disabled={placed.length === 0}
+              className="font-note text-sm text-[var(--ink-soft)] underline hover:text-[var(--ink)] disabled:opacity-40"
             >
-              adivinar
+              ⌫ borrar
+            </button>
+            <button
+              onClick={() => setPlaced([])}
+              disabled={placed.length === 0}
+              className="font-note text-sm text-[var(--ink-soft)] underline hover:text-[var(--ink)] disabled:opacity-40"
+            >
+              limpiar
             </button>
           </div>
-          {wrong.length > 0 && (
-            <p className="mt-3 font-hand text-lg text-[var(--ink-soft)]">
-              frío frío: <span className="line-through">{wrong.join(", ")}</span>
-            </p>
-          )}
         </>
       )}
 
+      {phase === "playing" && !puzzle && (
+        <p className="mt-4 text-center font-hand text-xl text-rose-500">
+          (este dibujo es viejo, empezá uno nuevo)
+        </p>
+      )}
+
       {phase === "won" && (
-        <Result title="¡le pegaste! 🎉" subtitle={`era “${revealWord}”`} reload={reload} />
+        <Result title="¡le pegaste! +1 🎉" subtitle={`era “${revealWord}”`} reload={reload} />
       )}
       {phase === "timeup" && (
         <Result
           title="se acabó el tiempo 😅"
-          subtitle={revealWord ? `era “${revealWord}”` : ""}
+          subtitle={revealWord ? `era “${revealWord}” — ahora dibujás vos` : "ahora dibujás vos"}
           reload={reload}
         />
       )}
