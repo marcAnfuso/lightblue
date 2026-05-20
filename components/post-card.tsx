@@ -12,57 +12,57 @@ function relativeTime(ts: number): string {
   if (h < 24) return `hace ${h} h`;
   const d = Math.floor(h / 24);
   if (d < 30) return `hace ${d} ${d === 1 ? "día" : "días"}`;
-  const date = new Date(ts);
-  return date.toLocaleDateString("es-AR", { day: "numeric", month: "short" });
+  return new Date(ts).toLocaleDateString("es-AR", { day: "numeric", month: "short" });
+}
+
+// rotación pseudo-aleatoria pero estable por id
+function tiltFor(id: string): number {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) % 1000;
+  return ((h / 1000) * 6 - 3); // entre -3 y +3 grados
 }
 
 export default function PostCard({ post, index }: { post: Post; index: number }) {
   const isImage = !!post.imageUrl;
+  const tilt = tiltFor(post.id);
+  const who = post.author === "cele" ? "Cele" : "Marc";
 
   return (
     <motion.article
-      layout
-      initial={{ opacity: 0, y: 18, filter: "blur(6px)" }}
-      animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+      initial={{ opacity: 0, y: 24, rotate: tilt - 4, scale: 0.95 }}
+      animate={{ opacity: 1, y: 0, rotate: tilt, scale: 1 }}
       transition={{
-        duration: 0.7,
-        delay: Math.min(index * 0.06, 0.6),
+        duration: 0.6,
+        delay: Math.min(index * 0.05, 0.5),
         ease: [0.22, 1, 0.36, 1],
       }}
-      whileHover={{ y: -3 }}
-      className="group break-inside-avoid mb-4 sm:mb-5"
+      whileHover={{ rotate: 0, scale: 1.03, zIndex: 10 }}
+      className="relative break-inside-avoid mb-6"
     >
-      <div className="relative rounded-2xl bg-white/70 backdrop-blur-md border border-cele-200/60 overflow-hidden shadow-[0_12px_30px_-18px_rgba(54,131,191,0.35)] transition-shadow group-hover:shadow-[0_20px_45px_-22px_rgba(54,131,191,0.5)]">
-        {isImage ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={post.imageUrl!}
-            alt=""
-            loading="lazy"
-            className="w-full h-auto block"
-          />
-        ) : (
-          <div className="px-5 py-6 sm:px-6 sm:py-7">
-            <p className="font-serif text-[17px] sm:text-[19px] text-ink leading-snug whitespace-pre-wrap">
-              {post.text}
-            </p>
-          </div>
-        )}
+      {/* cinta arriba */}
+      <span
+        className="tape left-1/2 -translate-x-1/2 -top-3"
+        style={{ transform: `translateX(-50%) rotate(${tilt > 0 ? -4 : 4}deg)` }}
+      />
 
-        <div
-          className={[
-            "flex items-center justify-between px-4 py-2.5 text-[11px] uppercase tracking-[0.18em]",
-            isImage
-              ? "absolute inset-x-0 bottom-0 text-white bg-gradient-to-t from-black/45 to-transparent pt-12"
-              : "border-t border-cele-100/80 text-cele-700/80 bg-cele-50/40",
-          ].join(" ")}
-        >
-          <span className="font-medium">
-            de {post.author === "cele" ? "Cele" : "Marc"}
-          </span>
-          <span className="opacity-80">{relativeTime(post.createdAt)}</span>
+      {isImage ? (
+        <figure className="bg-white p-2.5 pb-10 shadow-[0_10px_25px_-12px_rgba(20,60,90,0.5)]">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={post.imageUrl!} alt="" loading="lazy" className="w-full block" />
+          <figcaption className="font-hand text-xl text-[var(--ink)] text-center mt-2 px-1 leading-tight">
+            de {who} · {relativeTime(post.createdAt)}
+          </figcaption>
+        </figure>
+      ) : (
+        <div className="bg-[#fffef5] px-5 py-5 shadow-[0_10px_25px_-12px_rgba(20,60,90,0.5)]">
+          <p className="font-hand text-2xl text-[var(--ink)] leading-snug whitespace-pre-wrap">
+            {post.text}
+          </p>
+          <p className="font-note text-xs text-[var(--ink-soft)] mt-3 text-right">
+            — {who}, {relativeTime(post.createdAt)}
+          </p>
         </div>
-      </div>
+      )}
     </motion.article>
   );
 }

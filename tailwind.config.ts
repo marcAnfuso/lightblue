@@ -21,22 +21,9 @@ export default {
         },
       },
       fontFamily: {
-        serif: ["var(--font-fraunces)", "ui-serif", "Georgia", "serif"],
+        hand: ["var(--font-caveat)", "ui-serif", "cursive"],
+        note: ["var(--font-kalam)", "ui-serif", "cursive"],
         sans: ["var(--font-geist-sans)", "ui-sans-serif", "system-ui", "sans-serif"],
-      },
-      animation: {
-        breathe: "breathe 8s ease-in-out infinite",
-        float: "float 6s ease-in-out infinite",
-      },
-      keyframes: {
-        breathe: {
-          "0%, 100%": { opacity: "0.55", transform: "scale(1)" },
-          "50%": { opacity: "0.85", transform: "scale(1.04)" },
-        },
-        float: {
-          "0%, 100%": { transform: "translateY(0px)" },
-          "50%": { transform: "translateY(-6px)" },
-        },
       },
     },
   },
