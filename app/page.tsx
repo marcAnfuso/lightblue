@@ -1,6 +1,7 @@
 import Letter from "@/components/hero";
 import Countdown from "@/components/countdown";
 import PostsGrid from "@/components/posts-grid";
+import PlansRoulette from "@/components/plans-roulette";
 import { listPosts } from "@/lib/posts";
 
 export const dynamic = "force-dynamic";
@@ -20,6 +21,10 @@ export default async function Home() {
           <Letter />
           <Countdown />
         </div>
+      </div>
+
+      <div className="mt-16 sm:mt-24 px-4 sm:px-6">
+        <PlansRoulette />
       </div>
 
       <div className="mt-16 sm:mt-24">

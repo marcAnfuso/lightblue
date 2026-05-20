@@ -2,6 +2,7 @@
 
 import { motion } from "motion/react";
 import type { Post } from "@/lib/posts";
+import ReactionsBar from "./reactions";
 
 function relativeTime(ts: number): string {
   const diff = Date.now() - ts;
@@ -57,6 +58,9 @@ export default function PostCard({ post, index }: { post: Post; index: number })
           <figcaption className="font-hand text-lg text-[var(--ink-soft)] text-center mt-2 px-1 leading-tight">
             de {who} · {relativeTime(post.createdAt)}
           </figcaption>
+          <div className="mt-2 px-1">
+            <ReactionsBar ts={String(post.createdAt)} initial={post.reactions} />
+          </div>
         </figure>
       ) : (
         <div className="bg-[#fffef5] px-5 py-5 shadow-[0_10px_25px_-12px_rgba(20,60,90,0.5)]">
@@ -66,6 +70,9 @@ export default function PostCard({ post, index }: { post: Post; index: number })
           <p className="font-note text-xs text-[var(--ink-soft)] mt-3 text-right">
             — {who}, {relativeTime(post.createdAt)}
           </p>
+          <div className="mt-2 pt-2 border-t border-[var(--rule)]">
+            <ReactionsBar ts={String(post.createdAt)} initial={post.reactions} />
+          </div>
         </div>
       )}
     </motion.article>
