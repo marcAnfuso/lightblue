@@ -20,7 +20,7 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  let body: { author?: string; word?: string; dataUrl?: string };
+  let body: { author?: string; word?: string; dataUrl?: string; strokes?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -42,7 +42,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const res = await submitDrawing({ author, word, dataUrl });
+    const res = await submitDrawing({ author, word, dataUrl, strokes: body.strokes });
     if (!res.ok) return NextResponse.json({ error: res.error }, { status: 409 });
     return NextResponse.json({ ok: true });
   } catch (err) {

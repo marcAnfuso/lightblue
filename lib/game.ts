@@ -17,6 +17,7 @@ type Round = {
   drawer: Author;
   word: string; // secreto
   imageUrl: string;
+  strokesUrl?: string; // replay del proceso de dibujo
   createdAt: number;
   status: RoundStatus;
   puzzle?: Puzzle;
@@ -28,6 +29,7 @@ export type PublicRound = {
   drawer?: Author;
   guesser?: Author;
   imageUrl?: string;
+  strokesUrl?: string; // replay del proceso de dibujo
   createdAt?: number;
   puzzle?: Puzzle; // letras mezcladas + estructura (sin revelar el orden)
   result?: Round["result"];
@@ -168,6 +170,7 @@ export async function getPublicRound(): Promise<PublicRound> {
     scores,
   };
   if (r.status === "awaiting_guess" && r.puzzle) pub.puzzle = r.puzzle;
+  if (r.status === "awaiting_guess" && r.strokesUrl) pub.strokesUrl = r.strokesUrl;
   if (r.status === "done") {
     pub.word = r.word;
     pub.nextDrawer = r.result?.guesser; // dibuja quien adivinó/perdió
@@ -179,10 +182,12 @@ export async function submitDrawing({
   author,
   word,
   dataUrl,
+  strokes,
 }: {
   author: Author;
   word: string;
   dataUrl: string;
+  strokes?: unknown;
 }): Promise<{ ok: boolean; error?: string }> {
   const current = await readRound();
   // no se puede dibujar mientras el otro está adivinando
@@ -201,18 +206,38 @@ export async function submitDrawing({
   const buf = Buffer.from(match[1], "base64");
   if (buf.byteLength > 3 * 1024 * 1024) return { ok: false, error: "dibujo muy pesado" };
 
-  const blob = await put(`${IMG_PREFIX}${Date.now()}.png`, buf, {
+  const ts = Date.now();
+  const blob = await put(`${IMG_PREFIX}${ts}.png`, buf, {
     access: "public",
     contentType: "image/png",
     addRandomSuffix: false,
   });
+
+  // replay del proceso (trazos) como blob aparte
+  let strokesUrl: string | undefined;
+  try {
+    if (strokes) {
+      const json = JSON.stringify(strokes);
+      if (json.length < 2_000_000) {
+        const sblob = await put(`game/strokes-${ts}.json`, json, {
+          access: "public",
+          contentType: "application/json",
+          addRandomSuffix: false,
+        });
+        strokesUrl = sblob.url;
+      }
+    }
+  } catch {
+    /* si falla, seguimos con la imagen estática */
+  }
 
   const finalWord = word.trim().slice(0, 60);
   await writeRound({
     drawer: author,
     word: finalWord,
     imageUrl: blob.url,
-    createdAt: Date.now(),
+    strokesUrl,
+    createdAt: ts,
     status: "awaiting_guess",
     puzzle: buildPuzzle(finalWord),
   });

@@ -32,8 +32,12 @@ const COLORS = [
 ];
 const SIZES = [3, 7, 14, 26];
 
+export type Stroke = { c: string; lw: number; p: number[] };
+export type DrawStrokes = { w: number; h: number; strokes: Stroke[] };
+
 export type DrawCanvasHandle = {
   toDataURL: () => string;
+  getStrokes: () => DrawStrokes;
   isBlank: () => boolean;
   clear: () => void;
 };
@@ -43,6 +47,8 @@ const DrawCanvas = forwardRef<DrawCanvasHandle>(function DrawCanvas(_props, ref)
   const drawing = useRef(false);
   const last = useRef<{ x: number; y: number } | null>(null);
   const dirty = useRef(false);
+  const strokes = useRef<Stroke[]>([]);
+  const cur = useRef<Stroke | null>(null);
   const [color, setColor] = useState(COLORS[0]);
   const [size, setSize] = useState(SIZES[1]);
   const [eraser, setEraser] = useState(false);
@@ -64,10 +70,13 @@ const DrawCanvas = forwardRef<DrawCanvasHandle>(function DrawCanvas(_props, ref)
 
   useImperativeHandle(ref, () => ({
     toDataURL: () => canvasRef.current!.toDataURL("image/png"),
+    getStrokes: () => ({ w: W, h: H, strokes: strokes.current }),
     isBlank: () => !dirty.current,
     clear: () => {
       fillWhite();
       dirty.current = false;
+      strokes.current = [];
+      cur.current = null;
     },
   }));
 
@@ -99,12 +108,47 @@ const DrawCanvas = forwardRef<DrawCanvasHandle>(function DrawCanvas(_props, ref)
     dirty.current = true;
   }
 
+  function redrawAll() {
+    fillWhite();
+    const c = getCtx();
+    c.lineCap = "round";
+    c.lineJoin = "round";
+    for (const s of strokes.current) {
+      if (s.p.length === 2) {
+        c.fillStyle = s.c;
+        c.beginPath();
+        c.arc(s.p[0], s.p[1], s.lw / 2, 0, Math.PI * 2);
+        c.fill();
+        continue;
+      }
+      c.strokeStyle = s.c;
+      c.lineWidth = s.lw;
+      c.beginPath();
+      c.moveTo(s.p[0], s.p[1]);
+      for (let i = 2; i < s.p.length; i += 2) c.lineTo(s.p[i], s.p[i + 1]);
+      c.stroke();
+    }
+  }
+
+  function undo() {
+    if (strokes.current.length === 0) return;
+    strokes.current.pop();
+    redrawAll();
+    dirty.current = strokes.current.length > 0;
+  }
+
   function down(e: React.PointerEvent) {
     e.preventDefault();
     (e.target as Element).setPointerCapture?.(e.pointerId);
     drawing.current = true;
     const p = pos(e);
     last.current = p;
+    cur.current = {
+      c: eraser ? "#ffffff" : color,
+      lw: eraser ? size * 2.4 : size,
+      p: [Math.round(p.x), Math.round(p.y)],
+    };
+    strokes.current.push(cur.current);
     paintDot(p);
   }
   function move(e: React.PointerEvent) {
@@ -112,9 +156,11 @@ const DrawCanvas = forwardRef<DrawCanvasHandle>(function DrawCanvas(_props, ref)
     e.preventDefault();
     const p = pos(e);
     if (last.current) paintLine(last.current, p);
+    cur.current?.p.push(Math.round(p.x), Math.round(p.y));
     last.current = p;
   }
   function up() {
+    cur.current = null;
     drawing.current = false;
     last.current = null;
   }
@@ -203,6 +249,13 @@ const DrawCanvas = forwardRef<DrawCanvasHandle>(function DrawCanvas(_props, ref)
         <span className="mx-1 w-px h-6 bg-[var(--rule)]" />
 
         <button
+          onClick={undo}
+          aria-label="deshacer"
+          className="font-note text-sm px-3 py-1.5 rounded-sm border-2 border-[var(--rule)] text-[var(--ink-soft)] hover:border-[var(--ink-soft)] hover:text-[var(--ink)] transition"
+        >
+          ↶ deshacer
+        </button>
+        <button
           onClick={() => setEraser((e) => !e)}
           className={[
             "font-note text-sm px-3 py-1.5 rounded-sm border-2 transition",
@@ -217,6 +270,8 @@ const DrawCanvas = forwardRef<DrawCanvasHandle>(function DrawCanvas(_props, ref)
           onClick={() => {
             fillWhite();
             dirty.current = false;
+            strokes.current = [];
+            cur.current = null;
           }}
           className="font-note text-sm px-3 py-1.5 rounded-sm border-2 border-[var(--rule)] text-[var(--ink-soft)] hover:border-rose-400 hover:text-rose-500 transition"
         >
