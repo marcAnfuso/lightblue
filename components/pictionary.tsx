@@ -13,10 +13,11 @@ const nameOf = (a?: Author) => (a === "cele" ? "Cele" : "Marc");
 const otherName = (a: Author) => (a === "marc" ? "Cele" : "Marc");
 
 export default function Pictionary() {
-  const [author, setAuthor] = useState<Author>("marc");
+  const [author, setAuthor] = useState<Author | null>(null);
   const [round, setRound] = useState<PublicRound | null>(null);
   const [used, setUsed] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
 
   useEffect(() => {
     const s = typeof window !== "undefined" ? localStorage.getItem("lb_author") : null;
@@ -47,7 +48,7 @@ export default function Pictionary() {
     load();
   }
 
-  function handleAuthor(a: Author) {
+  function pickIdentity(a: Author) {
     setAuthor(a);
     try {
       localStorage.setItem("lb_author", a);
@@ -59,39 +60,82 @@ export default function Pictionary() {
       initial={{ opacity: 0, y: 18, rotate: -1 }}
       animate={{ opacity: 1, y: 0, rotate: -1 }}
       transition={{ duration: 0.6 }}
-      className="relative max-w-md mx-auto bg-[#fffef5] px-6 sm:px-7 py-8 shadow-[0_18px_40px_-18px_rgba(20,60,90,0.55)]"
+      className="relative max-w-md mx-auto bg-[#fffef5] px-5 sm:px-7 py-7 shadow-[0_18px_40px_-18px_rgba(20,60,90,0.55)]"
     >
       <span
         className="tape left-1/2 -top-3"
         style={{ transform: "translateX(-50%) rotate(-2deg)" }}
       />
 
-      <h2 className="font-hand text-4xl text-[var(--ink)] text-center">
-        dibujá y adiviná 🎨
-      </h2>
+      {author === null ? (
+        <IdentityGate onPick={pickIdentity} />
+      ) : (
+        <>
+          {!creating && (
+            <div className="mb-5">
+              <h2 className="font-hand text-3xl text-[var(--ink)] text-center leading-none">
+                dibujá y adiviná 🎨
+              </h2>
+              {round && <Scoreboard scores={round.scores} />}
+            </div>
+          )}
 
-      {round && <Scoreboard scores={round.scores} />}
+          {loading || !round ? (
+            <p className="font-hand text-xl text-[var(--ink-soft)] text-center">cargando…</p>
+          ) : (
+            <Stage
+              author={author}
+              round={round}
+              used={used}
+              creating={creating}
+              setCreating={setCreating}
+              reload={load}
+            />
+          )}
 
-      <div className="flex gap-2 justify-center mt-4">
-        <AuthorChip current={author} value="marc" onClick={handleAuthor} />
-        <AuthorChip current={author} value="cele" onClick={handleAuthor} />
-      </div>
-
-      <div className="mt-6">
-        {loading || !round ? (
-          <p className="font-hand text-xl text-[var(--ink-soft)] text-center">cargando…</p>
-        ) : (
-          <Stage author={author} round={round} used={used} reload={load} />
-        )}
-      </div>
-
-      <button
-        onClick={resetMatch}
-        className="mt-6 block mx-auto font-note text-xs text-[var(--ink-soft)]/70 underline hover:text-[var(--ink)]"
-      >
-        reiniciar marcador
-      </button>
+          {!creating && (
+            <div className="mt-6 flex items-center justify-center gap-3 font-note text-xs text-[var(--ink-soft)]/70">
+              <span>sos {author === "cele" ? "Cele" : "Marc"}</span>
+              <button onClick={() => setAuthor(null)} className="underline hover:text-[var(--ink)]">
+                cambiar
+              </button>
+              <span>·</span>
+              <button onClick={resetMatch} className="underline hover:text-[var(--ink)]">
+                reiniciar marcador
+              </button>
+            </div>
+          )}
+        </>
+      )}
     </motion.section>
+  );
+}
+
+function IdentityGate({ onPick }: { onPick: (a: Author) => void }) {
+  return (
+    <div className="text-center py-4">
+      <h2 className="font-hand text-4xl text-[var(--ink)]">dibujá y adiviná 🎨</h2>
+      <p className="font-hand text-2xl text-[var(--ink-soft)] mt-4 mb-5">¿quién sos?</p>
+      <div className="flex flex-col gap-3">
+        <motion.button
+          onClick={() => onPick("marc")}
+          whileTap={{ scale: 0.97 }}
+          className="w-full py-3.5 font-hand text-3xl text-white bg-[var(--ink)] hover:bg-[var(--ink-soft)] transition rounded-sm shadow-md"
+        >
+          soy Marc
+        </motion.button>
+        <motion.button
+          onClick={() => onPick("cele")}
+          whileTap={{ scale: 0.97 }}
+          className="w-full py-3.5 font-hand text-3xl text-[var(--ink)] bg-cele-50 border-2 border-[var(--ink-soft)] hover:bg-cele-100 transition rounded-sm"
+        >
+          soy Cele
+        </motion.button>
+      </div>
+      <p className="font-note text-xs text-[var(--ink-soft)] mt-4">
+        queda guardado en este celular.
+      </p>
+    </div>
   );
 }
 
@@ -114,15 +158,17 @@ function Stage({
   author,
   round,
   used,
+  creating,
+  setCreating,
   reload,
 }: {
   author: Author;
   round: PublicRound;
   used: string[];
+  creating: boolean;
+  setCreating: (v: boolean) => void;
   reload: () => void;
 }) {
-  const [creating, setCreating] = useState(false);
-
   // alguien está adivinando
   if (round.status === "awaiting_guess") {
     if (author === round.guesser) {
@@ -604,27 +650,3 @@ function Result({
   );
 }
 
-function AuthorChip({
-  current,
-  value,
-  onClick,
-}: {
-  current: Author;
-  value: Author;
-  onClick: (v: Author) => void;
-}) {
-  const active = current === value;
-  return (
-    <button
-      onClick={() => onClick(value)}
-      className={[
-        "font-hand text-xl px-4 py-1 rounded-sm border-2 transition",
-        active
-          ? "bg-[var(--ink)] text-white border-[var(--ink)]"
-          : "bg-transparent text-[var(--ink-soft)] border-[var(--rule)] hover:border-[var(--ink-soft)]",
-      ].join(" ")}
-    >
-      soy {value === "cele" ? "Cele" : "Marc"}
-    </button>
-  );
-}

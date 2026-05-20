@@ -8,10 +8,29 @@ import {
   useState,
 } from "react";
 
-const W = 680;
-const H = 520;
-const COLORS = ["#1f4f74", "#e0507a", "#e8a13b", "#3aa564", "#1a2230"];
-const SIZES = [4, 9, 18];
+const W = 720;
+const H = 720;
+const COLORS = [
+  "#1a2230", // negro
+  "#1f4f74", // azul tinta
+  "#2d6cdf", // azul
+  "#3aa5d8", // celeste
+  "#2a9d8f", // turquesa
+  "#3aa564", // verde
+  "#8bc34a", // verde claro
+  "#f2c94c", // amarillo
+  "#e8a13b", // mostaza
+  "#e8732b", // naranja
+  "#c0392b", // rojo
+  "#e0507a", // rosa
+  "#b06ab3", // violeta
+  "#7b5bd6", // púrpura
+  "#8d5a3b", // marrón
+  "#f1b6a0", // piel
+  "#7a7f87", // gris
+  "#ffffff", // blanco
+];
+const SIZES = [3, 7, 14, 26];
 
 export type DrawCanvasHandle = {
   toDataURL: () => string;
@@ -110,8 +129,7 @@ const DrawCanvas = forwardRef<DrawCanvasHandle>(function DrawCanvas(_props, ref)
         onPointerUp={up}
         onPointerLeave={up}
         onPointerCancel={up}
-        className="w-full block rounded-md border-2 border-[var(--ink-soft)] bg-white touch-none cursor-crosshair"
-        style={{ aspectRatio: `${W} / ${H}` }}
+        className="w-full block rounded-md border-2 border-[var(--ink-soft)] bg-white touch-none cursor-crosshair aspect-square"
       />
 
       <div className="mt-3 flex items-center gap-2 flex-wrap">
@@ -125,7 +143,9 @@ const DrawCanvas = forwardRef<DrawCanvasHandle>(function DrawCanvas(_props, ref)
             aria-label={`color ${c}`}
             className={[
               "w-7 h-7 rounded-full border-2 transition",
-              color === c && !eraser ? "border-[var(--ink)] scale-110" : "border-white",
+              color === c && !eraser
+                ? "border-[var(--ink)] scale-110 ring-2 ring-cele-200"
+                : "border-[var(--rule)]",
             ].join(" ")}
             style={{ background: c }}
           />
