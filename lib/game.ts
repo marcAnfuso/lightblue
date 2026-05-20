@@ -5,9 +5,21 @@ import { WORD_BANK } from "./words";
 const KEY = "game/pinturillo.json";
 const USED_KEY = "game/used.json";
 const SCORE_KEY = "game/score.json";
+const GALLERY_KEY = "game/gallery.json";
 const IMG_PREFIX = "game/draw-";
 
 export type Scores = { marc: number; cele: number };
+
+export type GalleryItem = {
+  id: string;
+  imageUrl: string;
+  strokesUrl?: string;
+  word: string;
+  drawer: Author;
+  guesser: Author;
+  guessed: boolean;
+  at: number;
+};
 
 export type RoundStatus = "awaiting_guess" | "done";
 
@@ -243,11 +255,7 @@ export async function submitDrawing({
   });
 
   await markUsed(finalWord);
-
-  // limpieza best-effort del dibujo anterior
-  if (current?.imageUrl) {
-    del(current.imageUrl).catch(() => {});
-  }
+  // ya no borramos el dibujo anterior: queda guardado en la galería
 
   return { ok: true };
 }
@@ -270,9 +278,52 @@ export async function tryGuess({
     const scores = await getScores();
     scores[author] += 1; // +1 al que adivinó
     await writeScores(scores);
+    await archiveRound(r, author, true);
     return { correct: true, word: r.word };
   }
   return { correct: false };
+}
+
+export async function getGallery(): Promise<GalleryItem[]> {
+  const { blobs } = await list({ prefix: GALLERY_KEY, limit: 1 });
+  const b = blobs.find((x) => x.pathname === GALLERY_KEY);
+  if (!b) return [];
+  try {
+    const res = await fetch(b.url, { cache: "no-store" });
+    if (!res.ok) return [];
+    const d = (await res.json()) as GalleryItem[];
+    return Array.isArray(d) ? d : [];
+  } catch {
+    return [];
+  }
+}
+
+async function appendToGallery(item: GalleryItem): Promise<void> {
+  const current = await getGallery();
+  const next = [item, ...current].slice(0, 200);
+  await put(GALLERY_KEY, JSON.stringify(next), {
+    access: "public",
+    contentType: "application/json",
+    addRandomSuffix: false,
+    cacheControlMaxAge: 0,
+  });
+}
+
+async function archiveRound(r: Round, guesser: Author, guessed: boolean): Promise<void> {
+  try {
+    await appendToGallery({
+      id: String(r.createdAt),
+      imageUrl: r.imageUrl,
+      strokesUrl: r.strokesUrl,
+      word: r.word,
+      drawer: r.drawer,
+      guesser,
+      guessed,
+      at: Date.now(),
+    });
+  } catch {
+    /* la galería es secundaria, no rompe el juego */
+  }
 }
 
 export async function resetGame(): Promise<void> {
@@ -293,5 +344,6 @@ export async function revealRound({
   r.status = "done";
   r.result = { guessed: false, guesser: author, at: Date.now() };
   await writeRound(r);
+  await archiveRound(r, author, false);
   return { word: r.word };
 }

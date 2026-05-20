@@ -10,12 +10,18 @@ export const metadata = {
 export default function JugarPage() {
   return (
     <main className="min-h-screen py-8 sm:py-12 px-4 sm:px-6">
-      <div className="max-w-md mx-auto mb-5">
+      <div className="max-w-md mx-auto mb-5 flex items-center justify-between">
         <Link
           href="/"
           className="font-hand text-2xl text-white drop-shadow-[0_1px_3px_rgba(20,60,90,0.4)] hover:opacity-80 transition"
         >
           ← volver a la paginita
+        </Link>
+        <Link
+          href="/galeria"
+          className="font-hand text-2xl text-white drop-shadow-[0_1px_3px_rgba(20,60,90,0.4)] hover:opacity-80 transition"
+        >
+          galería 🖼️
         </Link>
       </div>
 
