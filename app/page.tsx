@@ -1,6 +1,7 @@
 import Letter from "@/components/hero";
 import Countdown from "@/components/countdown";
 import PostsGrid from "@/components/posts-grid";
+import Link from "next/link";
 import PlansRoulette from "@/components/plans-roulette";
 import { listPosts } from "@/lib/posts";
 
@@ -25,6 +26,21 @@ export default async function Home() {
 
       <div className="mt-16 sm:mt-24 px-4 sm:px-6">
         <PlansRoulette />
+      </div>
+
+      <div className="mt-12 sm:mt-16 px-4 sm:px-6">
+        <Link href="/jugar" className="group block max-w-md mx-auto">
+          <div className="relative bg-[#fffef5] px-7 py-6 text-center shadow-[0_18px_40px_-18px_rgba(20,60,90,0.55)] rotate-[0.6deg] group-hover:rotate-0 transition-transform">
+            <span
+              className="tape left-1/2 -top-3"
+              style={{ transform: "translateX(-50%) rotate(-3deg)" }}
+            />
+            <p className="font-hand text-4xl text-[var(--ink)]">dibujá y adiviná 🎨</p>
+            <p className="font-hand text-xl text-[var(--ink-soft)] mt-1">
+              uno dibuja una palabra, el otro adivina. tocá para jugar →
+            </p>
+          </div>
+        </Link>
       </div>
 
       <div className="mt-16 sm:mt-24">
