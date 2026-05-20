@@ -386,19 +386,12 @@ function GuessView({
 }) {
   const [phase, setPhase] = useState<"intro" | "playing" | "won" | "timeup">("intro");
   const [timeLeft, setTimeLeft] = useState(GUESS_SECONDS);
-  const [placed, setPlaced] = useState<{ idx: number; ch: string }[]>([]);
-  const [wrong, setWrong] = useState(false);
+  const [guess, setGuess] = useState("");
+  const [wrong, setWrong] = useState<string[]>([]);
+  const [shake, setShake] = useState(false);
+  const [checking, setChecking] = useState(false);
   const [revealWord, setRevealWord] = useState<string | null>(null);
-  const checking = useRef(false);
   const tick = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const puzzle = round.puzzle;
-  const total = useMemo(
-    () => (puzzle ? puzzle.segments.reduce((a, b) => a + b, 0) : 0),
-    [puzzle]
-  );
-  const usedIdx = useMemo(() => new Set(placed.map((p) => p.idx)), [placed]);
-  const assembled = placed.map((p) => p.ch).join("");
 
   useEffect(() => {
     return () => {
@@ -409,7 +402,8 @@ function GuessView({
   function start() {
     setPhase("playing");
     setTimeLeft(GUESS_SECONDS);
-    setPlaced([]);
+    setGuess("");
+    setWrong([]);
     tick.current = setInterval(() => {
       setTimeLeft((t) => {
         if (t <= 1) {
@@ -438,40 +432,33 @@ function GuessView({
     }
   }
 
-  // auto-chequea cuando se completan todos los casilleros
-  useEffect(() => {
-    if (phase !== "playing" || total === 0 || placed.length !== total || checking.current) {
-      return;
-    }
-    checking.current = true;
-    (async () => {
-      try {
-        const res = await fetch("/api/game/guess", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ author, guess: assembled }),
-        });
-        const data = await res.json();
-        if (data?.correct) {
-          if (tick.current) clearInterval(tick.current);
-          setRevealWord(data.word ?? assembled);
-          setPhase("won");
-        } else {
-          setWrong(true);
-          setTimeout(() => {
-            setWrong(false);
-            setPlaced([]);
-            checking.current = false;
-          }, 700);
-          return;
-        }
-      } catch {
-        /* noop */
+  async function submitGuess() {
+    const g = guess.trim();
+    if (!g || checking) return;
+    setChecking(true);
+    try {
+      const res = await fetch("/api/game/guess", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ author, guess: g }),
+      });
+      const data = await res.json();
+      if (data?.correct) {
+        if (tick.current) clearInterval(tick.current);
+        setRevealWord(data.word ?? g);
+        setPhase("won");
+      } else {
+        setWrong((w) => [g, ...w].slice(0, 10));
+        setGuess("");
+        setShake(true);
+        setTimeout(() => setShake(false), 450);
       }
-      checking.current = false;
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [placed, total, phase]);
+    } catch {
+      /* noop */
+    } finally {
+      setChecking(false);
+    }
+  }
 
   const mmss = useMemo(() => {
     const m = Math.floor(timeLeft / 60);
@@ -486,7 +473,7 @@ function GuessView({
           {nameOf(round.drawer)} te dejó un dibujo 🎨
         </p>
         <p className="font-hand text-xl text-[var(--ink-soft)] mt-1">
-          tenés <b>1:30</b> para adivinar con las letras.
+          tenés <b>1:30</b> para escribir qué es.
         </p>
         <motion.button
           onClick={start}
@@ -503,7 +490,7 @@ function GuessView({
     <div>
       <ReplayCanvas strokesUrl={round.strokesUrl} imageUrl={round.imageUrl} />
 
-      {phase === "playing" && puzzle && (
+      {phase === "playing" && (
         <>
           {/* barra de tiempo */}
           <div className="mt-3 h-2.5 w-full rounded-full bg-cele-100 overflow-hidden">
@@ -524,83 +511,35 @@ function GuessView({
             {mmss}
           </p>
 
-          {/* casilleros */}
+          {/* campo de texto */}
           <motion.div
-            animate={wrong ? { x: [-6, 6, -6, 6, 0] } : { x: 0 }}
+            animate={shake ? { x: [-7, 7, -7, 7, 0] } : { x: 0 }}
             transition={{ duration: 0.4 }}
-            className="mt-3 flex flex-wrap justify-center gap-x-3 gap-y-2"
+            className="mt-3 flex gap-2"
           >
-            {puzzle.segments.map((len, segIdx) => {
-              const offset = puzzle.segments.slice(0, segIdx).reduce((a, b) => a + b, 0);
-              return (
-                <div key={segIdx} className="flex gap-1">
-                  {Array.from({ length: len }).map((_, j) => {
-                    const ch = placed[offset + j]?.ch ?? "";
-                    return (
-                      <span
-                        key={j}
-                        className={[
-                          "w-7 h-9 sm:w-8 sm:h-10 flex items-center justify-center border-b-[3px] font-hand text-2xl",
-                          wrong
-                            ? "border-rose-400 text-rose-500"
-                            : "border-[var(--ink-soft)] text-[var(--ink)]",
-                        ].join(" ")}
-                      >
-                        {ch}
-                      </span>
-                    );
-                  })}
-                </div>
-              );
-            })}
+            <input
+              value={guess}
+              onChange={(e) => setGuess(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && submitGuess()}
+              autoFocus
+              placeholder="¿qué es?"
+              className="min-w-0 flex-1 px-3 py-2 bg-transparent border-2 border-[var(--rule)] focus:border-[var(--ink)] outline-none transition font-hand text-2xl text-[var(--ink)] rounded-sm"
+            />
+            <button
+              onClick={submitGuess}
+              disabled={checking || !guess.trim()}
+              className="shrink-0 px-4 font-note bg-[var(--ink)] text-white rounded-sm disabled:opacity-40 hover:bg-[var(--ink-soft)] transition"
+            >
+              adivinar
+            </button>
           </motion.div>
 
-          {/* banco de letras */}
-          <div className="mt-5 flex flex-wrap justify-center gap-2">
-            {puzzle.letters.map((ch, i) => {
-              const isUsed = usedIdx.has(i);
-              return (
-                <motion.button
-                  key={i}
-                  whileTap={{ scale: 0.85 }}
-                  disabled={isUsed || placed.length >= total}
-                  onClick={() => setPlaced((p) => [...p, { idx: i, ch }])}
-                  className={[
-                    "w-10 h-11 rounded-md font-hand text-2xl border-2 transition",
-                    isUsed
-                      ? "opacity-25 border-[var(--rule)] bg-transparent"
-                      : "bg-cele-50 border-[var(--ink-soft)] text-[var(--ink)] hover:bg-cele-100",
-                  ].join(" ")}
-                >
-                  {ch}
-                </motion.button>
-              );
-            })}
-          </div>
-
-          <div className="mt-4 flex items-center justify-center gap-4">
-            <button
-              onClick={() => setPlaced((p) => p.slice(0, -1))}
-              disabled={placed.length === 0}
-              className="font-note text-sm text-[var(--ink-soft)] underline hover:text-[var(--ink)] disabled:opacity-40"
-            >
-              ⌫ borrar
-            </button>
-            <button
-              onClick={() => setPlaced([])}
-              disabled={placed.length === 0}
-              className="font-note text-sm text-[var(--ink-soft)] underline hover:text-[var(--ink)] disabled:opacity-40"
-            >
-              limpiar
-            </button>
-          </div>
+          {wrong.length > 0 && (
+            <p className="mt-3 font-hand text-lg text-[var(--ink-soft)] text-center">
+              probaste: <span className="line-through">{wrong.join(", ")}</span>
+            </p>
+          )}
         </>
-      )}
-
-      {phase === "playing" && !puzzle && (
-        <p className="mt-4 text-center font-hand text-xl text-rose-500">
-          (este dibujo es viejo, empezá uno nuevo)
-        </p>
       )}
 
       {phase === "won" && (
