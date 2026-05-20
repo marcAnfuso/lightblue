@@ -64,9 +64,11 @@ export async function createTextPost({
 export async function createImagePost({
   file,
   author,
+  text,
 }: {
   file: File;
   author: Author;
+  text?: string;
 }): Promise<Post> {
   const createdAt = Date.now();
   const ext = file.name.split(".").pop() ?? "jpg";
@@ -75,10 +77,11 @@ export async function createImagePost({
     contentType: file.type || "application/octet-stream",
     addRandomSuffix: false,
   });
-  const payload = {
+  const payload: Omit<Post, "id"> = {
     author,
     createdAt,
     imageUrl: imageBlob.url,
+    ...(text ? { text } : {}),
   };
   await put(jsonKey(createdAt), JSON.stringify(payload), {
     access: "public",

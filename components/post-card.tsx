@@ -46,10 +46,15 @@ export default function PostCard({ post, index }: { post: Post; index: number })
       />
 
       {isImage ? (
-        <figure className="bg-white p-2.5 pb-10 shadow-[0_10px_25px_-12px_rgba(20,60,90,0.5)]">
+        <figure className="bg-white p-2.5 pb-4 shadow-[0_10px_25px_-12px_rgba(20,60,90,0.5)]">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={post.imageUrl!} alt="" loading="lazy" className="w-full block" />
-          <figcaption className="font-hand text-xl text-[var(--ink)] text-center mt-2 px-1 leading-tight">
+          {post.text && (
+            <p className="font-hand text-2xl text-[var(--ink)] mt-3 px-1 leading-snug whitespace-pre-wrap">
+              {post.text}
+            </p>
+          )}
+          <figcaption className="font-hand text-lg text-[var(--ink-soft)] text-center mt-2 px-1 leading-tight">
             de {who} · {relativeTime(post.createdAt)}
           </figcaption>
         </figure>

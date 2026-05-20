@@ -46,8 +46,14 @@ export async function POST(req: Request) {
         { status: 413 }
       );
     }
+    if (text.length > MAX_TEXT_LEN) {
+      return NextResponse.json(
+        { error: `el texto se pasa de ${MAX_TEXT_LEN} caracteres` },
+        { status: 400 }
+      );
+    }
     try {
-      const post = await createImagePost({ file, author });
+      const post = await createImagePost({ file, author, text: text || undefined });
       return NextResponse.json({ post });
     } catch (err) {
       return NextResponse.json(

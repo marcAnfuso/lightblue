@@ -16,7 +16,6 @@ export default function UploadDialog({
   onCreated: (p: Post) => void;
 }) {
   const [author, setAuthor] = useState<Author>("marc");
-  const [tab, setTab] = useState<"text" | "image">("text");
   const [text, setText] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -63,20 +62,16 @@ export default function UploadDialog({
 
   async function submit() {
     setError(null);
-    if (tab === "text" && !text.trim()) {
-      setError("escribime algo, dale");
-      return;
-    }
-    if (tab === "image" && !file) {
-      setError("elegí una foto");
+    if (!text.trim() && !file) {
+      setError("escribime algo o sumá una foto");
       return;
     }
 
     setSubmitting(true);
     const form = new FormData();
     form.set("author", author);
-    if (tab === "text") form.set("text", text);
-    if (tab === "image" && file) form.set("file", file);
+    if (text.trim()) form.set("text", text);
+    if (file) form.set("file", file);
 
     try {
       const res = await fetch("/api/posts", { method: "POST", body: form });
@@ -103,7 +98,7 @@ export default function UploadDialog({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.25 }}
-          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-[#1f4f74]/40 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-[#1f4f74]/40 backdrop-blur-sm overflow-y-auto"
           onClick={onClose}
         >
           <motion.div
@@ -112,12 +107,15 @@ export default function UploadDialog({
             exit={{ y: 30, opacity: 0, scale: 0.97 }}
             transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
             onClick={(e) => e.stopPropagation()}
-            className="relative w-full max-w-md sheet px-7 py-9"
+            className="relative w-full max-w-md sheet px-7 py-9 my-auto"
           >
-            <span className="tape left-1/2 -translate-x-1/2 -top-3" style={{ transform: "translateX(-50%) rotate(-3deg)" }} />
+            <span
+              className="tape left-1/2 -top-3"
+              style={{ transform: "translateX(-50%) rotate(-3deg)" }}
+            />
 
             <div className="flex items-center justify-between mb-1">
-              <h2 className="font-hand text-3xl text-[var(--ink)]">dejá algo lindo</h2>
+              <h2 className="font-hand text-3xl text-[var(--ink)]">dejá un recuerdito</h2>
               <button
                 onClick={onClose}
                 className="font-note text-[var(--ink-soft)] hover:text-[var(--ink)] transition"
@@ -127,7 +125,7 @@ export default function UploadDialog({
               </button>
             </div>
             <p className="font-hand text-xl text-[var(--ink-soft)] mb-4">
-              queda guardado acá, para el otro.
+              escribí algo, sumá una foto, o las dos cosas.
             </p>
 
             <div className="flex gap-2 mb-4">
@@ -135,50 +133,42 @@ export default function UploadDialog({
               <AuthorChip current={author} value="cele" onClick={handleAuthor} />
             </div>
 
-            <div className="flex gap-4 border-b-2 border-[var(--rule)] mb-5">
-              <TabBtn current={tab} value="text" onClick={setTab} label="un mensajito" />
-              <TabBtn current={tab} value="image" onClick={setTab} label="una foto" />
-            </div>
+            <textarea
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              rows={3}
+              maxLength={1200}
+              placeholder="lo que se te cante…"
+              className="w-full px-3 py-2 bg-transparent border-2 border-[var(--rule)] focus:border-[var(--ink)] outline-none transition resize-none font-hand text-2xl text-[var(--ink)] rounded-sm"
+            />
 
-            {tab === "text" ? (
-              <textarea
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                rows={4}
-                maxLength={1200}
-                placeholder="lo que se te cante…"
-                className="w-full px-3 py-2 bg-transparent border-2 border-[var(--rule)] focus:border-[var(--ink)] outline-none transition resize-none font-hand text-2xl text-[var(--ink)] rounded-sm"
-              />
-            ) : (
-              <div>
-                <input
-                  ref={inputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-                  className="hidden"
-                />
-                {preview ? (
-                  <div className="relative bg-white p-2 shadow-md">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={preview} alt="preview" className="w-full block" />
-                    <button
-                      onClick={() => setFile(null)}
-                      className="absolute top-3 right-3 font-note px-2 py-1 bg-white/90 text-xs text-[var(--ink)] border border-[var(--rule)] rounded-sm"
-                    >
-                      cambiar
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => inputRef.current?.click()}
-                    className="w-full py-9 border-2 border-dashed border-[var(--rule)] hover:border-[var(--ink)] transition font-hand text-2xl text-[var(--ink-soft)] rounded-sm"
-                  >
-                    elegí una foto
-                    <span className="block font-note text-xs mt-1">hasta 4MB</span>
-                  </button>
-                )}
+            <input
+              ref={inputRef}
+              type="file"
+              accept="image/*"
+              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              className="hidden"
+            />
+
+            {preview ? (
+              <div className="relative bg-white p-2 shadow-md mt-3">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={preview} alt="preview" className="w-full block" />
+                <button
+                  onClick={() => setFile(null)}
+                  className="absolute top-3 right-3 font-note px-2 py-1 bg-white/90 text-xs text-[var(--ink)] border border-[var(--rule)] rounded-sm"
+                >
+                  sacar foto
+                </button>
               </div>
+            ) : (
+              <button
+                onClick={() => inputRef.current?.click()}
+                className="mt-3 w-full py-4 border-2 border-dashed border-[var(--rule)] hover:border-[var(--ink)] transition font-hand text-2xl text-[var(--ink-soft)] rounded-sm"
+              >
+                + sumar una foto
+                <span className="block font-note text-xs mt-1">opcional · hasta 4MB</span>
+              </button>
             )}
 
             {error && <p className="mt-3 font-hand text-xl text-rose-500">{error}</p>}
@@ -219,33 +209,6 @@ function AuthorChip({
       ].join(" ")}
     >
       de {value === "cele" ? "Cele" : "Marc"}
-    </button>
-  );
-}
-
-function TabBtn({
-  current,
-  value,
-  onClick,
-  label,
-}: {
-  current: "text" | "image";
-  value: "text" | "image";
-  onClick: (v: "text" | "image") => void;
-  label: string;
-}) {
-  const active = current === value;
-  return (
-    <button
-      onClick={() => onClick(value)}
-      className={[
-        "font-hand text-2xl pb-1 -mb-0.5 border-b-2 transition",
-        active
-          ? "border-[var(--ink)] text-[var(--ink)]"
-          : "border-transparent text-[var(--ink-soft)] hover:text-[var(--ink)]",
-      ].join(" ")}
-    >
-      {label}
     </button>
   );
 }
