@@ -120,7 +120,7 @@ const DrawCanvas = forwardRef<DrawCanvasHandle>(function DrawCanvas(_props, ref)
   }
 
   return (
-    <div>
+    <div className="no-callout">
       <canvas
         ref={canvasRef}
         width={W}
@@ -130,7 +130,9 @@ const DrawCanvas = forwardRef<DrawCanvasHandle>(function DrawCanvas(_props, ref)
         onPointerUp={up}
         onPointerLeave={up}
         onPointerCancel={up}
-        className="w-full block rounded-md border-2 border-[var(--ink-soft)] bg-white touch-none cursor-crosshair aspect-square"
+        onContextMenu={(e) => e.preventDefault()}
+        className="w-full block rounded-md border-2 border-[var(--ink-soft)] bg-white touch-none select-none cursor-crosshair aspect-square"
+        style={{ WebkitUserSelect: "none", userSelect: "none", WebkitTouchCallout: "none" }}
       />
 
       <div className="mt-3 flex items-center gap-2 flex-wrap">

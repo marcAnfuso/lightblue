@@ -344,7 +344,7 @@ function DrawView({
   }
 
   return (
-    <div>
+    <div className="no-callout">
       <p className="font-hand text-2xl text-[var(--ink)] text-center">
         dibujá: <span className="text-[var(--ink-soft)]">“{word}”</span>
       </p>

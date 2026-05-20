@@ -109,3 +109,13 @@ body {
   scrollbar-width: thin;
   scrollbar-color: #7ec4ec transparent;
 }
+
+/* Evita que al dibujar (arrastrar el dedo) se seleccione texto o salte
+   el menú de "mantener apretado" en mobile */
+.no-callout,
+.no-callout * {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  user-select: none;
+}
