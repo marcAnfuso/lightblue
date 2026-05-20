@@ -1,5 +1,6 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { createImagePost, createTextPost, listPosts, type Author } from "@/lib/posts";
+import { notifyNewPost } from "@/lib/mail";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -54,6 +55,7 @@ export async function POST(req: Request) {
     }
     try {
       const post = await createImagePost({ file, author, text: text || undefined });
+      after(() => notifyNewPost({ author, hasImage: true, text }).catch(() => {}));
       return NextResponse.json({ post });
     } catch (err) {
       return NextResponse.json(
@@ -75,6 +77,7 @@ export async function POST(req: Request) {
 
   try {
     const post = await createTextPost({ text, author });
+    after(() => notifyNewPost({ author, hasImage: false, text }).catch(() => {}));
     return NextResponse.json({ post });
   } catch (err) {
     return NextResponse.json(
