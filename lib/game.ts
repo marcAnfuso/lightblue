@@ -98,6 +98,7 @@ async function writeRound(r: Round): Promise<void> {
     access: "public",
     contentType: "application/json",
     addRandomSuffix: false,
+    cacheControlMaxAge: 0, // estado mutable: lectura siempre fresca
   });
 }
 
@@ -120,6 +121,7 @@ async function writeScores(s: Scores): Promise<void> {
     access: "public",
     contentType: "application/json",
     addRandomSuffix: false,
+    cacheControlMaxAge: 0, // estado mutable: lectura siempre fresca
   });
 }
 
@@ -148,6 +150,7 @@ async function markUsed(word: string): Promise<void> {
     access: "public",
     contentType: "application/json",
     addRandomSuffix: false,
+    cacheControlMaxAge: 0, // estado mutable: lectura siempre fresca
   });
 }
 
