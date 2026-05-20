@@ -9,6 +9,7 @@ const BURST_EMOJIS = ["🩵", "✨", "💙", "🎉", "🥹"];
 
 export default function PlansRoulette() {
   const [plans, setPlans] = useState<Plan[]>([]);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [author, setAuthor] = useState<Author>("marc");
   const [text, setText] = useState("");
@@ -32,12 +33,23 @@ export default function PlansRoulette() {
     try {
       const res = await fetch("/api/plans", { cache: "no-store" });
       const data = await res.json();
-      setPlans(data.plans ?? []);
+      const list: Plan[] = data.plans ?? [];
+      setPlans(list);
+      setSelected(new Set(list.map((p) => p.id))); // arrancan todas activas
     } catch {
       setPlans([]);
     } finally {
       setLoading(false);
     }
+  }
+
+  function toggleSelected(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   }
 
   function handleAuthor(a: Author) {
@@ -59,7 +71,9 @@ export default function PlansRoulette() {
       });
       const data = await res.json();
       if (res.ok && data.plan) {
-        setPlans((prev) => [...prev, data.plan as Plan]);
+        const plan = data.plan as Plan;
+        setPlans((prev) => [...prev, plan]);
+        setSelected((prev) => new Set(prev).add(plan.id));
         setText("");
       }
     } catch {
@@ -71,6 +85,11 @@ export default function PlansRoulette() {
 
   async function remove(id: string) {
     setPlans((prev) => prev.filter((p) => p.id !== id));
+    setSelected((prev) => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
     try {
       await fetch(`/api/plans?id=${encodeURIComponent(id)}`, { method: "DELETE" });
     } catch {
@@ -78,15 +97,17 @@ export default function PlansRoulette() {
     }
   }
 
+  const pool = plans.filter((p) => selected.has(p.id));
+
   function spin() {
-    if (spinning || plans.length === 0) return;
+    if (spinning || pool.length === 0) return;
     setSpinning(true);
     setLanded(false);
-    const winner = plans[Math.floor(Math.random() * plans.length)];
+    const winner = pool[Math.floor(Math.random() * pool.length)];
     const total = 18 + Math.floor(Math.random() * 8);
     let i = 0;
     const step = () => {
-      setDisplay(plans[i % plans.length].text);
+      setDisplay(pool[i % pool.length].text);
       i++;
       if (i < total) {
         // arranca rápido y va frenando (efecto tómbola)
@@ -117,7 +138,7 @@ export default function PlansRoulette() {
 
       <h2 className="font-hand text-4xl text-[var(--ink)] text-center">¿qué hacemos?</h2>
       <p className="font-hand text-xl text-[var(--ink-soft)] text-center mt-1">
-        cargá ideas los dos y, cuando no sepan qué hacer, girá.
+        tocá las ideas para dejar solo las que pintan hoy, y girá.
       </p>
 
       {/* Pantalla de resultado */}
@@ -151,7 +172,12 @@ export default function PlansRoulette() {
                 landed ? "text-3xl sm:text-4xl" : "text-2xl",
               ].join(" ")}
             >
-              {display ?? (plans.length ? "dale, girá 👇" : "todavía no hay ideas…")}
+              {display ??
+                (plans.length === 0
+                  ? "todavía no hay ideas…"
+                  : pool.length === 0
+                    ? "elegí alguna idea 👇"
+                    : "dale, girá 👇")}
             </motion.p>
           </AnimatePresence>
         </motion.div>
@@ -161,7 +187,7 @@ export default function PlansRoulette() {
 
       <motion.button
         onClick={spin}
-        disabled={spinning || plans.length === 0}
+        disabled={spinning || pool.length === 0}
         whileTap={{ scale: 0.96 }}
         animate={spinning ? { scale: [1, 1.015, 1] } : { scale: 1 }}
         transition={spinning ? { duration: 0.4, repeat: Infinity } : { duration: 0.2 }}
@@ -169,6 +195,11 @@ export default function PlansRoulette() {
       >
         {spinning ? "girando…" : "girar la ruleta 🎡"}
       </motion.button>
+      {plans.length > 0 && !spinning && (
+        <p className="mt-2 text-center font-hand text-base text-[var(--ink-soft)]">
+          {pool.length} de {plans.length} en la ronda
+        </p>
+      )}
 
       {/* Cargar idea */}
       <div className="mt-6 flex gap-2 mb-3">
@@ -199,23 +230,38 @@ export default function PlansRoulette() {
       ) : (
         plans.length > 0 && (
           <ul className="mt-4 flex flex-wrap gap-2">
-            {plans.map((p) => (
-              <li
-                key={p.id}
-                className="flex items-center gap-1.5 bg-cele-50 border border-[var(--rule)] rounded-full pl-3 pr-2 py-1"
-              >
-                <span className="font-hand text-lg text-[var(--ink)] leading-none">
-                  {p.text}
-                </span>
-                <button
-                  onClick={() => remove(p.id)}
-                  aria-label="borrar idea"
-                  className="text-[var(--ink-soft)] hover:text-rose-500 transition text-xs leading-none"
+            {plans.map((p) => {
+              const on = selected.has(p.id);
+              return (
+                <li
+                  key={p.id}
+                  className={[
+                    "flex items-center gap-1.5 rounded-full pl-3 pr-2 py-1 border transition",
+                    on
+                      ? "bg-cele-100 border-[var(--ink-soft)]"
+                      : "bg-transparent border-dashed border-[var(--rule)] opacity-50",
+                  ].join(" ")}
                 >
-                  ✕
-                </button>
-              </li>
-            ))}
+                  <button
+                    onClick={() => toggleSelected(p.id)}
+                    aria-pressed={on}
+                    className={[
+                      "font-hand text-lg leading-none transition",
+                      on ? "text-[var(--ink)]" : "text-[var(--ink-soft)] line-through",
+                    ].join(" ")}
+                  >
+                    {p.text}
+                  </button>
+                  <button
+                    onClick={() => remove(p.id)}
+                    aria-label="borrar idea"
+                    className="text-[var(--ink-soft)] hover:text-rose-500 transition text-xs leading-none"
+                  >
+                    ✕
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         )
       )}
