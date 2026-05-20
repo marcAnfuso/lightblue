@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getPublicRound, submitDrawing } from "@/lib/game";
+import { getPublicRound, getUsedWords, submitDrawing } from "@/lib/game";
 import type { Author } from "@/lib/posts";
 
 export const runtime = "nodejs";
@@ -9,10 +9,13 @@ const AUTHORS: Author[] = ["marc", "cele"];
 
 export async function GET() {
   try {
-    const round = await getPublicRound();
-    return NextResponse.json({ round });
+    const [round, used] = await Promise.all([getPublicRound(), getUsedWords()]);
+    return NextResponse.json({ round, used });
   } catch (err) {
-    return NextResponse.json({ round: null, error: (err as Error).message }, { status: 500 });
+    return NextResponse.json(
+      { round: null, used: [], error: (err as Error).message },
+      { status: 500 }
+    );
   }
 }
 

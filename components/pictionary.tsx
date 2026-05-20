@@ -15,6 +15,7 @@ const otherName = (a: Author) => (a === "marc" ? "Cele" : "Marc");
 export default function Pictionary() {
   const [author, setAuthor] = useState<Author>("marc");
   const [round, setRound] = useState<PublicRound | null>(null);
+  const [used, setUsed] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -28,6 +29,7 @@ export default function Pictionary() {
       const res = await fetch("/api/game", { cache: "no-store" });
       const data = await res.json();
       setRound(data.round ?? { status: "empty" });
+      setUsed(Array.isArray(data.used) ? data.used : []);
     } catch {
       setRound({ status: "empty" });
     } finally {
@@ -70,7 +72,7 @@ export default function Pictionary() {
         {loading || !round ? (
           <p className="font-hand text-xl text-[var(--ink-soft)] text-center">cargando…</p>
         ) : (
-          <Stage author={author} round={round} reload={load} />
+          <Stage author={author} round={round} used={used} reload={load} />
         )}
       </div>
     </motion.section>
@@ -80,10 +82,12 @@ export default function Pictionary() {
 function Stage({
   author,
   round,
+  used,
   reload,
 }: {
   author: Author;
   round: PublicRound;
+  used: string[];
   reload: () => void;
 }) {
   const [creating, setCreating] = useState(false);
@@ -104,6 +108,7 @@ function Stage({
     return (
       <DrawView
         author={author}
+        used={used}
         onCancel={() => setCreating(false)}
         onSent={() => {
           setCreating(false);
@@ -173,15 +178,17 @@ function Waiting({ text, reload }: { text: string; reload: () => void }) {
 
 function DrawView({
   author,
+  used,
   onCancel,
   onSent,
 }: {
   author: Author;
+  used: string[];
   onCancel: () => void;
   onSent: () => void;
 }) {
   const canvasRef = useRef<DrawCanvasHandle>(null);
-  const [options, setOptions] = useState<string[]>(() => pickWords(3));
+  const [options, setOptions] = useState<string[]>(() => pickWords(3, used));
   const [word, setWord] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -234,7 +241,7 @@ function DrawView({
         </div>
         <div className="mt-4 flex items-center justify-center gap-4">
           <button
-            onClick={() => setOptions(pickWords(3))}
+            onClick={() => setOptions(pickWords(3, used))}
             className="font-note text-sm text-[var(--ink-soft)] underline hover:text-[var(--ink)]"
           >
             otras 3

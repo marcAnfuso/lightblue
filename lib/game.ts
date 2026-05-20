@@ -1,7 +1,9 @@
 import { del, list, put } from "@vercel/blob";
 import type { Author } from "./posts";
+import { WORD_BANK } from "./words";
 
 const KEY = "game/pinturillo.json";
+const USED_KEY = "game/used.json";
 const IMG_PREFIX = "game/draw-";
 
 export type RoundStatus = "awaiting_guess" | "done";
@@ -59,6 +61,34 @@ async function writeRound(r: Round): Promise<void> {
   });
 }
 
+export async function getUsedWords(): Promise<string[]> {
+  const { blobs } = await list({ prefix: USED_KEY, limit: 1 });
+  const b = blobs.find((x) => x.pathname === USED_KEY);
+  if (!b) return [];
+  try {
+    const res = await fetch(b.url, { cache: "no-store" });
+    if (!res.ok) return [];
+    const data = (await res.json()) as string[];
+    return Array.isArray(data) ? data : [];
+  } catch {
+    return [];
+  }
+}
+
+async function markUsed(word: string): Promise<void> {
+  const used = await getUsedWords();
+  const lower = word.toLowerCase().trim();
+  const already = used.some((w) => w.toLowerCase().trim() === lower);
+  let next = already ? used : [...used, word];
+  // reciclar cuando quedan pocas sin usar
+  if (next.length >= WORD_BANK.length - 3) next = [word];
+  await put(USED_KEY, JSON.stringify(next), {
+    access: "public",
+    contentType: "application/json",
+    addRandomSuffix: false,
+  });
+}
+
 export async function getPublicRound(): Promise<PublicRound> {
   const r = await readRound();
   if (!r) return { status: "empty" };
@@ -101,13 +131,16 @@ export async function submitDrawing({
     addRandomSuffix: false,
   });
 
+  const finalWord = word.trim().slice(0, 60);
   await writeRound({
     drawer: author,
-    word: word.trim().slice(0, 60),
+    word: finalWord,
     imageUrl: blob.url,
     createdAt: Date.now(),
     status: "awaiting_guess",
   });
+
+  await markUsed(finalWord);
 
   // limpieza best-effort del dibujo anterior
   if (current?.imageUrl) {
